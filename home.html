@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgriTrack - Farm Hardware & QR Inventory</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QRCode.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            amber: {
+              500: '#f59e0b',
+              600: '#d97706',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Industrial / Utility styling accents */
+    .clip-corner {
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-100 bg-slate-900 selection:bg-brand-500 selection:text-slate-950">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-950 border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo / Title -->
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-brand-600/20 text-brand-500 rounded-lg border border-brand-500/30">
+            <i data-lucide="tractor" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg leading-none text-white tracking-tight flex items-center gap-2">
+              AGRITRACK <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">HARDWARE</span>
+            </h1>
+            <p class="text-xs text-slate-400">Farm Tool & Equipment Inventory</p>
+          </div>
+        </div>
+
+        <!-- Action Bar & Quick Stats -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button id="scan-qr-btn" onclick="openScannerModal()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-slate-950 font-semibold text-sm px-3.5 py-2 rounded-lg transition-colors shadow-lg shadow-brand-900/20 active:scale-95">
+            <i data-lucide="qr-code" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Scan Code</span>
+          </button>
+          
+          <button onclick="openAddModal()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm px-3.5 py-2 rounded-lg border border-slate-700 transition-colors active:scale-95">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Add Asset</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+    <!-- Metrics Cards Banner -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700/60 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Items</p>
+          <p id="stat-total-items" class="text-2xl font-bold font-mono text-white mt-1">0</p>
+        </div>
+        <div class="p-3 bg-slate-700/50 rounded-lg text-slate-300">
+          <i data-lucide="boxes" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700/60 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">In Stock</p>
+          <p id="stat-in-stock" class="text-2xl font-bold font-mono text-brand-400 mt-1">0</p>
+        </div>
+        <div class="p-3 bg-brand-500/10 rounded-lg text-brand-400">
+          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700/60 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Low Stock</p>
+          <p id="stat-low-stock" class="text-2xl font-bold font-mono text-amber-400 mt-1">0</p>
+        </div>
+        <div class="p-3 bg-amber-500/10 rounded-lg text-amber-400">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700/60 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Decommissioned</p>
+          <p id="stat-retired" class="text-2xl font-bold font-mono text-slate-400 mt-1">0</p>
+        </div>
+        <div class="p-3 bg-slate-700/30 rounded-lg text-slate-400">
+          <i data-lucide="archive" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+      <!-- Search Input -->
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input type="text" id="search-input" oninput="applyFilters()" placeholder="Search by name, Asset ID, serial #, or notes..." class="w-full bg-slate-900 border border-slate-700 text-slate-100 text-sm rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:border-brand-500 placeholder-slate-500 transition-colors">
+      </div>
+
+      <!-- Filters Group -->
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+        <!-- Category Filter -->
+        <select id="filter-category" onchange="applyFilters()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-brand-500 flex-1 sm:flex-none">
+          <option value="ALL">All Categories</option>
+          <option value="Tractors & Implements">Tractors & Implements</option>
+          <option value="Shop Tools">Shop Tools</option>
+          <option value="Fasteners & Hardware">Fasteners & Hardware</option>
+          <option value="Electrical & Fluids">Electrical & Fluids</option>
+          <option value="Irrigation & Pumps">Irrigation & Pumps</option>
+        </select>
+
+        <!-- Location Filter -->
+        <select id="filter-location" onchange="applyFilters()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-brand-500 flex-1 sm:flex-none">
+          <option value="ALL">All Locations</option>
+          <option value="Main Barn">Main Barn</option>
+          <option value="Shop Bay 1">Shop Bay 1</option>
+          <option value="Tool Crib">Tool Crib</option>
+          <option value="North Storage Shed">North Storage Shed</option>
+          <option value="Field Trailer">Field Trailer</option>
+        </select>
+
+        <!-- Status Filter -->
+        <select id="filter-status" onchange="applyFilters()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-brand-500 flex-1 sm:flex-none">
+          <option value="ALL">All Statuses</option>
+          <option value="IN_STOCK">In Stock</option>
+          <option value="LOW_STOCK">Low Stock Alert</option>
+        </select>
+
+        <!-- Toggle Decommissioned Checkbox -->
+        <label class="flex items-center gap-2 bg-slate-900 border border-slate-700 text-slate-300 text-xs font-medium px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors select-none">
+          <input type="checkbox" id="show-decommissioned" onchange="applyFilters()" class="rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500 focus:ring-offset-slate-900">
+          <span>Show Decommissioned</span>
+        </label>
+
+        <!-- Purge Decommissioned Button -->
+        <button onclick="purgeDecommissioned()" class="px-3 py-2.5 bg-red-950/40 hover:bg-red-900/60 text-red-300 rounded-lg text-xs font-medium transition-colors border border-red-800/50 flex items-center gap-1.5" title="Permanently Purge All Retired Items">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span class="hidden xl:inline">Purge Retired</span>
+        </button>
+
+        <!-- Reset Button -->
+        <button onclick="resetFilters()" class="px-3 py-2.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors border border-slate-600/50" title="Reset Filters">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Inventory Data Table / Grid View -->
+    <div class="bg-slate-800/80 rounded-xl border border-slate-700/60 overflow-hidden flex flex-col flex-1">
+      <div class="overflow-x-auto custom-scrollbar flex-1">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="bg-slate-950/70 text-slate-400 font-medium text-xs uppercase tracking-wider border-b border-slate-700/80 sticky top-0 z-10 backdrop-blur-md">
+            <tr>
+              <th scope="col" class="px-4 py-3.5">Asset & Name</th>
+              <th scope="col" class="px-4 py-3.5">Category</th>
+              <th scope="col" class="px-4 py-3.5">Storage Location</th>
+              <th scope="col" class="px-4 py-3.5 text-center">Stock Level</th>
+              <th scope="col" class="px-4 py-3.5">Status</th>
+              <th scope="col" class="px-4 py-3.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-table-body" class="divide-y divide-slate-700/50">
+            <!-- Dynamic rows will be inserted here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State View -->
+      <div id="empty-state" class="hidden flex-col items-center justify-center p-12 text-center">
+        <div class="p-4 bg-slate-700/40 rounded-full text-slate-400 mb-3">
+          <i data-lucide="package-search" class="w-8 h-8"></i>
+        </div>
+        <h3 class="text-base font-semibold text-slate-200">No hardware assets found</h3>
+        <p class="text-sm text-slate-400 mt-1 max-w-sm">Try adjusting your filters or search terms, or register a new farm item into inventory.</p>
+        <button onclick="resetFilters()" class="mt-4 text-xs font-semibold text-brand-400 hover:text-brand-300 underline underline-offset-4">Reset all search filters</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL 1: View Asset & QR Code Modal -->
+  <div id="view-qr-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="qr-code" class="w-5 h-5 text-brand-400"></i>
+          <h3 class="font-bold text-slate-100" id="qr-modal-title">Asset Tag Preview</h3>
+        </div>
+        <button onclick="closeModal('view-qr-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 flex flex-col items-center text-center">
+        <!-- Physical Tag Representation -->
+        <div class="bg-white p-5 rounded-xl border-4 border-slate-800 shadow-inner flex flex-col items-center max-w-xs w-full">
+          <div class="flex items-center justify-between w-full border-b border-slate-200 pb-2 mb-3">
+            <span class="text-[10px] font-black tracking-widest text-slate-900 uppercase">AGRITRACK PROPERTY</span>
+            <span id="tag-asset-id" class="text-xs font-mono font-bold text-brand-700">PWR-032</span>
+          </div>
+          
+          <div id="qrcode-container" class="my-1"></div>
+
+          <p id="tag-item-name" class="font-bold text-slate-900 text-sm mt-3 line-clamp-1">Milwaukee 1/2 Impact Wrench</p>
+          <p id="tag-item-loc" class="text-[11px] font-medium text-slate-600">Loc: Shop Bay 1</p>
+        </div>
+
+        <!-- Details Summary -->
+        <div class="w-full mt-5 bg-slate-800/60 rounded-lg p-3 text-left text-xs space-y-1.5 border border-slate-700/60">
+          <div class="flex justify-between"><span class="text-slate-400">Category:</span><span id="qr-modal-category" class="text-slate-200 font-medium">--</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Min Threshold:</span><span id="qr-modal-min" class="text-slate-200 font-mono">--</span></div>
+          <div class="flex justify-between"><span class="text-slate-400">Notes / Specs:</span><span id="qr-modal-notes" class="text-slate-200 italic truncate max-w-[180px]">--</span></div>
+        </div>
+
+        <!-- Print / Action Buttons -->
+        <div class="grid grid-cols-2 gap-3 w-full mt-5">
+          <button onclick="printQRCode()" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm py-2.5 rounded-lg border border-slate-700 transition-colors">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            Print Label
+          </button>
+          <button onclick="closeModal('view-qr-modal')" class="bg-brand-600 hover:bg-brand-500 text-slate-950 font-semibold text-sm py-2.5 rounded-lg transition-colors">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Add / Edit Item Modal -->
+  <div id="add-item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl">
+      <div class="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <h3 id="form-modal-title" class="font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-brand-400"></i>
+          Register New Farm Asset
+        </h3>
+        <button onclick="closeModal('add-item-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="asset-form" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="edit-item-id">
+        
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Asset ID -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Asset ID / QR Key *</label>
+            <input type="text" id="input-asset-id" required placeholder="e.g. TRC-004" class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500 uppercase">
+          </div>
+          <!-- Category -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Category *</label>
+            <select id="input-category" required class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+              <option value="Tractors & Implements">Tractors & Implements</option>
+              <option value="Shop Tools">Shop Tools</option>
+              <option value="Fasteners & Hardware">Fasteners & Hardware</option>
+              <option value="Electrical & Fluids">Electrical & Fluids</option>
+              <option value="Irrigation & Pumps">Irrigation & Pumps</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Item Name -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Item Description / Name *</label>
+          <input type="text" id="input-name" required placeholder="e.g. 5/8 Grade 8 Shear Pins (Box 50)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <!-- Location -->
+          <div class="col-span-3 sm:col-span-1">
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Storage Loc. *</label>
+            <select id="input-location" required class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+              <option value="Main Barn">Main Barn</option>
+              <option value="Shop Bay 1">Shop Bay 1</option>
+              <option value="Tool Crib">Tool Crib</option>
+              <option value="North Storage Shed">North Storage Shed</option>
+              <option value="Field Trailer">Field Trailer</option>
+            </select>
+          </div>
+          <!-- Quantity -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Initial Stock *</label>
+            <input type="number" id="input-qty" required min="0" value="1" class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+          </div>
+          <!-- Min Threshold -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Min Threshold</label>
+            <input type="number" id="input-min" min="0" value="1" class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+          </div>
+        </div>
+
+        <!-- Technical Notes -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Notes / Part Specs</label>
+          <textarea id="input-notes" rows="2" placeholder="e.g. For 10ft Rotary Cutter, SAE 80W-90 lube..." class="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500 placeholder-slate-600 resize-none"></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-3 border-t border-slate-800">
+          <button type="button" onclick="closeModal('add-item-modal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-slate-950 font-semibold text-sm rounded-lg transition-colors">Save Hardware Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Simulated QR Camera Scanner -->
+  <div id="scanner-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col">
+      <div class="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
+          <h3 class="font-bold text-slate-100 text-sm">QR Hardware Viewfinder</h3>
+        </div>
+        <button onclick="closeModal('scanner-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 flex flex-col items-center">
+        <!-- Viewfinder Box Simulation -->
+        <div class="relative w-full aspect-square max-w-[260px] bg-slate-950 rounded-2xl border-2 border-dashed border-brand-500/50 flex flex-col items-center justify-center overflow-hidden shadow-inner group">
+          <!-- Animated Laser Scan Line -->
+          <div class="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-brand-400 to-transparent shadow-[0_0_12px_#22c55e] animate-[bounce_2s_infinite]"></div>
+          
+          <i data-lucide="camera" class="w-10 h-10 text-slate-700 mb-2"></i>
+          <p class="text-xs text-slate-500 text-center px-4">Align physical QR code inside frame</p>
+          
+          <!-- Corner brackets -->
+          <div class="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-brand-500"></div>
+          <div class="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-brand-500"></div>
+          <div class="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-brand-500"></div>
+          <div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-brand-500"></div>
+        </div>
+
+        <p class="text-xs text-slate-400 mt-4 text-center">Simulate quick scan by picking an existing Asset ID or typing code manually below:</p>
+
+        <!-- Quick Pick Scanned ID Simulation -->
+        <div class="w-full mt-3 flex gap-2">
+          <select id="simulated-scan-select" class="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-sm font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500">
+            <!-- Populated dynamically -->
+          </select>
+          <button onclick="triggerSimulatedScan()" class="bg-brand-600 hover:bg-brand-500 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors">
+            Scan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Decommission Confirmation Modal -->
+  <div id="retire-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl p-6 text-center">
+      <div class="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+        <i data-lucide="archive" class="w-6 h-6"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-100">Decommission Asset?</h3>
+      <p class="text-sm text-slate-400 mt-2">
+        Are you sure you want to retire <span id="retire-item-name" class="font-bold text-slate-200"></span>? This will mark its status as <span class="text-slate-400 font-semibold">RETIRED</span> and freeze quantity changes.
+      </p>
+      
+      <div class="grid grid-cols-2 gap-3 mt-6">
+        <button onclick="closeModal('retire-modal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2.5 rounded-lg text-sm transition-colors">
+          Keep Active
+        </button>
+        <button id="confirm-retire-btn" class="bg-red-600 hover:bg-red-500 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors">
+          Decommission
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline Application Logic -->
+  <script>
+    // Initial Seed Data
+    const INITIAL_INVENTORY = [
+      { id: "IMP-014", name: "Bush Hog 10ft Rotary Cutter Blades", category: "Tractors & Implements", location: "North Storage Shed", qty: 4, minQty: 2, status: "IN_STOCK", notes: "Requires 80W-90 lube, shear pins 5/8 inch" },
+      { id: "PWR-032", name: "Milwaukee M18 1/2\" High Torque Impact", category: "Shop Tools", location: "Shop Bay 1", qty: 2, minQty: 2, status: "IN_STOCK", notes: "Kept in red hard case with 2x 5.0Ah batteries" },
+      { id: "FST-088", name: "Grade 8 Bolt Assortment Box (3/8 & 1/2)", category: "Fasteners & Hardware", location: "Tool Crib", qty: 1, minQty: 3, status: "LOW_STOCK", notes: "Reorder from AgriSupply supplier #441" },
+      { id: "PMP-007", name: "3-Inch Trash Pump Suction Hose (20ft)", category: "Irrigation & Pumps", location: "Main Barn", qty: 3, minQty: 2, status: "IN_STOCK", notes: "Camlock fittings installed on both ends" },
+      { id: "ELE-012", name: "7-Pin Trailer Wiring Harness Connectors", category: "Electrical & Fluids", location: "Tool Crib", qty: 0, minQty: 4, status: "LOW_STOCK", notes: "Used on utility trailers & livestock haulers" },
+      { id: "TRC-002", name: "John Deere PTO Adapter Sleeve 1-3/8\"", category: "Tractors & Implements", location: "Shop Bay 1", qty: 1, minQty: 1, status: "RETIRED", notes: "Splines worn out - marked for replacement scrap" }
+    ];
+
+    // App State
+    let inventory = [];
+    let qrcodeInstance = null;
+    let pendingRetireId = null;
+
+    // Load Data on Startup
+    window.onload = function() {
+      const stored = localStorage.getItem('agritrack_inventory');
+      if (stored) {
+        try {
+          inventory = JSON.parse(stored);
+        } catch(e) {
+          inventory = [...INITIAL_INVENTORY];
+        }
+      } else {
+        inventory = [...INITIAL_INVENTORY];
+        saveInventory();
+      }
+
+      renderInventory();
+      lucide.createIcons();
+    };
+
+    // Save to LocalStorage
+    function saveInventory() {
+      localStorage.setItem('agritrack_inventory', JSON.stringify(inventory));
+      updateStats();
+    }
+
+    // Update Banner Statistics
+    function updateStats() {
+      const total = inventory.length;
+      const inStock = inventory.filter(i => i.status === 'IN_STOCK').length;
+      const lowStock = inventory.filter(i => i.status === 'LOW_STOCK').length;
+      const retired = inventory.filter(i => i.status === 'RETIRED').length;
+
+      document.getElementById('stat-total-items').textContent = total;
+      document.getElementById('stat-in-stock').textContent = inStock;
+      document.getElementById('stat-low-stock').textContent = lowStock;
+      document.getElementById('stat-retired').textContent = retired;
+    }
+
+    // Render Filtered Table
+    function renderInventory() {
+      const tbody = document.getElementById('inventory-table-body');
+      const emptyState = document.getElementById('empty-state');
+      tbody.innerHTML = '';
+
+      const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+      const catVal = document.getElementById('filter-category').value;
+      const locVal = document.getElementById('filter-location').value;
+      const statusVal = document.getElementById('filter-status').value;
+      const showDecom = document.getElementById('show-decommissioned').checked;
+
+      const filtered = inventory.filter(item => {
+        // Automatically exclude decommissioned items unless explicitly toggled ON
+        if (!showDecom && item.status === 'RETIRED') {
+          return false;
+        }
+
+        const matchesSearch = item.name.toLowerCase().includes(searchVal) || 
+                              item.id.toLowerCase().includes(searchVal) || 
+                              (item.notes && item.notes.toLowerCase().includes(searchVal));
+        const matchesCat = (catVal === 'ALL') || (item.category === catVal);
+        const matchesLoc = (locVal === 'ALL') || (item.location === locVal);
+        const matchesStatus = (statusVal === 'ALL') || (item.status === statusVal);
+
+        return matchesSearch && matchesCat && matchesLoc && matchesStatus;
+      });
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+      } else {
+        emptyState.classList.add('hidden');
+        emptyState.classList.remove('flex');
+      }
+
+      filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition-colors";
+
+        // Status badge calculation
+        let statusBadge = '';
+        if (item.status === 'RETIRED') {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/60 text-slate-400 border border-slate-600/40"><i data-lucide="slash" class="w-3 h-3"></i> Retired</span>`;
+        } else if (item.qty <= item.minQty) {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"><i data-lucide="alert-triangle" class="w-3 h-3"></i> Low Stock</span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-brand-500/10 text-brand-400 border border-brand-500/20"><i data-lucide="check" class="w-3 h-3"></i> In Stock</span>`;
+        }
+
+        const isRetired = item.status === 'RETIRED';
+
+        tr.innerHTML = `
+          <td class="px-4 py-4">
+            <div class="flex items-start gap-3">
+              <button onclick="viewQRCode('${item.id}')" class="p-2 bg-slate-950 hover:bg-slate-900 border border-slate-700 rounded-lg text-brand-400 transition-colors shrink-0" title="View QR Tag">
+                <i data-lucide="qr-code" class="w-5 h-5"></i>
+              </button>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-xs font-bold text-brand-400 bg-brand-950/60 px-1.5 py-0.5 rounded border border-brand-800/50">${item.id}</span>
+                  <span class="font-semibold text-slate-100 ${isRetired ? 'line-through text-slate-500' : ''}">${escapeHtml(item.name)}</span>
+                </div>
+                ${item.notes ? `<p class="text-xs text-slate-400 mt-1 italic line-clamp-1">${escapeHtml(item.notes)}</p>` : ''}
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-4 text-slate-300 font-medium text-xs">
+            ${escapeHtml(item.category)}
+          </td>
+          <td class="px-4 py-4 text-slate-300 text-xs">
+            <span class="inline-flex items-center gap-1 text-slate-400">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500"></i>
+              ${escapeHtml(item.location)}
+            </span>
+          </td>
+          <td class="px-4 py-4 text-center">
+            <div class="inline-flex items-center gap-1 bg-slate-950 border border-slate-700/80 rounded-lg p-1">
+              <button onclick="adjustQty('${item.id}', -1)" ${isRetired ? 'disabled' : ''} class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                -
+              </button>
+              <span class="w-10 text-center font-mono font-bold text-sm ${item.qty <= item.minQty && !isRetired ? 'text-amber-400' : 'text-slate-100'}">${item.qty}</span>
+              <button onclick="adjustQty('${item.id}', 1)" ${isRetired ? 'disabled' : ''} class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                +
+              </button>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-1 font-mono">Min: ${item.minQty}</div>
+          </td>
+          <td class="px-4 py-4">
+            ${statusBadge}
+          </td>
+          <td class="px-4 py-4 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button onclick="openEditModal('${item.id}')" class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg transition-colors" title="Edit Item">
+                <i data-lucide="edit-3" class="w-4 h-4"></i>
+              </button>
+              ${!isRetired ? `
+                <button onclick="promptRetireModal('${item.id}')" class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Decommission / Retire Item">
+                  <i data-lucide="archive" class="w-4 h-4"></i>
+                </button>
+              ` : `
+                <button onclick="reactivateItem('${item.id}')" class="p-2 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg transition-colors" title="Reactivate Item">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+              `}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      updateStats();
+      lucide.createIcons();
+    }
+
+    // Helper: HTML Escaper
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
+    // Filter Trigger Functions
+    function applyFilters() {
+      renderInventory();
+    }
+
+    function resetFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('filter-category').value = 'ALL';
+      document.getElementById('filter-location').value = 'ALL';
+      document.getElementById('filter-status').value = 'ALL';
+      document.getElementById('show-decommissioned').checked = false;
+      renderInventory();
+    }
+
+    function purgeDecommissioned() {
+      const retiredCount = inventory.filter(i => i.status === 'RETIRED').length;
+      if (retiredCount === 0) {
+        return;
+      }
+      inventory = inventory.filter(i => i.status !== 'RETIRED');
+      saveInventory();
+      renderInventory();
+    }
+
+    // Quantity Increment / Decrement
+    function adjustQty(id, delta) {
+      const item = inventory.find(i => i.id === id);
+      if (!item || item.status === 'RETIRED') return;
+
+      item.qty = Math.max(0, item.qty + delta);
+      
+      // Auto update low stock status
+      if (item.qty <= item.minQty) {
+        item.status = 'LOW_STOCK';
+      } else {
+        item.status = 'IN_STOCK';
+      }
+
+      saveInventory();
+      renderInventory();
+    }
+
+    // Modal Control Helpers
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    // Open Add / Edit Modal
+    function openAddModal() {
+      document.getElementById('form-modal-title').innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5 text-brand-400"></i> Register New Farm Asset`;
+      document.getElementById('edit-item-id').value = '';
+      document.getElementById('input-asset-id').value = 'PWR-' + Math.floor(100 + Math.random() * 900);
+      document.getElementById('input-asset-id').removeAttribute('readonly');
+      document.getElementById('input-name').value = '';
+      document.getElementById('input-category').value = 'Shop Tools';
+      document.getElementById('input-location').value = 'Shop Bay 1';
+      document.getElementById('input-qty').value = '1';
+      document.getElementById('input-min').value = '1';
+      document.getElementById('input-notes').value = '';
+
+      document.getElementById('add-item-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function openEditModal(id) {
+      const item = inventory.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('form-modal-title').innerHTML = `<i data-lucide="edit-3" class="w-5 h-5 text-brand-400"></i> Edit Hardware Asset`;
+      document.getElementById('edit-item-id').value = item.id;
+      document.getElementById('input-asset-id').value = item.id;
+      document.getElementById('input-asset-id').setAttribute('readonly', 'true');
+      document.getElementById('input-name').value = item.name;
+      document.getElementById('input-category').value = item.category;
+      document.getElementById('input-location').value = item.location;
+      document.getElementById('input-qty').value = item.qty;
+      document.getElementById('input-min').value = item.minQty;
+      document.getElementById('input-notes').value = item.notes || '';
+
+      document.getElementById('add-item-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    // Form Submission Handling
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const editId = document.getElementById('edit-item-id').value;
+      const assetId = document.getElementById('input-asset-id').value.trim().toUpperCase();
+      const name = document.getElementById('input-name').value.trim();
+      const category = document.getElementById('input-category').value;
+      const location = document.getElementById('input-location').value;
+      const qty = parseInt(document.getElementById('input-qty').value, 10) || 0;
+      const minQty = parseInt(document.getElementById('input-min').value, 10) || 0;
+      const notes = document.getElementById('input-notes').value.trim();
+
+      if (editId) {
+        // Edit Existing Item
+        const item = inventory.find(i => i.id === editId);
+        if (item) {
+          item.name = name;
+          item.category = category;
+          item.location = location;
+          item.qty = qty;
+          item.minQty = minQty;
+          item.notes = notes;
+          if (item.status !== 'RETIRED') {
+            item.status = qty <= minQty ? 'LOW_STOCK' : 'IN_STOCK';
+          }
+        }
+      } else {
+        // Check for ID Collision
+        if (inventory.some(i => i.id === assetId)) {
+          alert(`Asset ID '${assetId}' already exists in inventory!`);
+          return;
+        }
+
+        const newStatus = qty <= minQty ? 'LOW_STOCK' : 'IN_STOCK';
+        inventory.push({
+          id: assetId,
+          name,
+          category,
+          location,
+          qty,
+          minQty,
+          status: newStatus,
+          notes
+        });
+      }
+
+      saveInventory();
+      renderInventory();
+      closeModal('add-item-modal');
+    }
+
+    // Decommission Modal Handling
+    function promptRetireModal(id) {
+      const item = inventory.find(i => i.id === id);
+      if (!item) return;
+
+      pendingRetireId = id;
+      document.getElementById('retire-item-name').textContent = item.name;
+      document.getElementById('confirm-retire-btn').onclick = function() {
+        retireItem(pendingRetireId);
+      };
+
+      document.getElementById('retire-modal').classList.remove('hidden');
+    }
+
+    function retireItem(id) {
+      const item = inventory.find(i => i.id === id);
+      if (item) {
+        item.status = 'RETIRED';
+        saveInventory();
+        renderInventory();
+      }
+      closeModal('retire-modal');
+    }
+
+    function reactivateItem(id) {
+      const item = inventory.find(i => i.id === id);
+      if (item) {
+        item.status = item.qty <= item.minQty ? 'LOW_STOCK' : 'IN_STOCK';
+        saveInventory();
+        renderInventory();
+      }
+    }
+
+    // Render QR Code Preview Tag
+    function viewQRCode(id) {
+      const item = inventory.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('qr-modal-title').textContent = `Asset Tag: ${item.id}`;
+      document.getElementById('tag-asset-id').textContent = item.id;
+      document.getElementById('tag-item-name').textContent = item.name;
+      document.getElementById('tag-item-loc').textContent = `Loc: ${item.location}`;
+      
+      document.getElementById('qr-modal-category').textContent = item.category;
+      document.getElementById('qr-modal-min').textContent = item.minQty;
+      document.getElementById('qr-modal-notes').textContent = item.notes || 'None';
+
+      const container = document.getElementById('qrcode-container');
+      container.innerHTML = '';
+
+      // Generate QR Code containing Asset ID JSON Payload
+      const payload = JSON.stringify({
+        id: item.id,
+        name: item.name,
+        loc: item.location
+      });
+
+      qrcodeInstance = new QRCode(container, {
+        text: payload,
+        width: 140,
+        height: 140,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      document.getElementById('view-qr-modal').classList.remove('hidden');
+    }
+
+    function printQRCode() {
+      window.print();
+    }
+
+    // Simulated QR Code Camera Scanner
+    function openScannerModal() {
+      const select = document.getElementById('simulated-scan-select');
+      select.innerHTML = '';
+
+      if (inventory.length === 0) {
+        const opt = document.createElement('option');
+        opt.textContent = "No inventory items to scan";
+        select.appendChild(opt);
+      } else {
+        inventory.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `[${item.id}] ${item.name}`;
+          select.appendChild(opt);
+        });
+      }
+
+      document.getElementById('scanner-modal').classList.remove('hidden');
+    }
+
+    function triggerSimulatedScan() {
+      const select = document.getElementById('simulated-scan-select');
+      const selectedId = select.value;
+
+      if (!selectedId) return;
+
+      closeModal('scanner-modal');
+      
+      // Auto-filter by scanned asset ID
+      document.getElementById('search-input').value = selectedId;
+      applyFilters();
+
+      // Automatically pop QR details modal for scanned item
+      setTimeout(() => {
+        viewQRCode(selectedId);
+      }, 200);
+    }
+  </script>
+</body>
+</html>
